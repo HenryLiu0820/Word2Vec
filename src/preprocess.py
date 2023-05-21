@@ -29,21 +29,20 @@ class preprocess:
     
     def build(self):
         print('Building corpus...')
-        step = 0
         self.word_count = {self.args.unk: 1}
-        with codecs.open(os.path.join(self.args.datadir, self.args.filename), 'r', encoding='utf-8') as file:
-            for line in file:
-                step += 1
-                if not step % 1000:
-                    print("working on {}kth line".format(step // 1000), end='\r')
-                line = line.strip()
-                if not line:
-                    continue
-                sent = line.split()
-                for word in sent:
-                    self.word_count[word] = self.word_count.get(word, 0) + 1
+        with open(os.path.join(self.args.datadir, self.args.filename), 'r') as file:
+            text = file.read().strip("\n")
+        file.close()
+        text = text.strip().lower()
+        self.text = text.split(" ")
+        print('Finished extracting words. Total words: {}'.format(len(text)))
+        # word count
+        for word in self.text:
+            self.word_count[word] = self.word_count.get(word, 0) + 1
+        
         print("")
-        self.idx2word = sorted(self.word_count, key=self.word_count.get, reverse=True)[: self.args.max_vocab - 1]
+        self.freq_dict = sorted(list(self.word_count.items()), key=lambda x: x[1], reverse=True)
+        self.idx2word = [self.args.unk] + [word for word, _ in self.freq_dict]
         self.word2idx = {self.idx2word[idx]: idx for idx, _ in enumerate(self.idx2word)}
         self.corpus = set([word for word in self.word2idx])
 
@@ -62,24 +61,10 @@ class preprocess:
         Convert the corpus to the trainable skipgram pairs
         '''
         print('Converting corpus to trainable data...')
-        step = 1
         data = []
-        with codecs.open(os.path.join(self.args.datadir, self.args.filename), 'r', encoding='utf-8') as file:
-            for line in file:
-                step += 1
-                if not step % 1000:
-                    print("working on {}kth line".format(step // 1000), end='\r')
-                line = line.strip()
-                if not line:
-                    continue
-                sent = []
-                for word in line.split():
-                    if word not in self.corpus:
-                        word = self.args.unk
-                    else: sent.append(word)
-                for i in range(len(sent)):
-                    iword, owords = self.skipgram(sent, i)
-                    data.append((self.word2idx[iword], [self.word2idx[oword] for oword in owords]))
+        for i in range(len(self.text)):
+            iword, owords = self.skipgram(self.text, i)
+            data.append((self.word2idx[iword], [self.word2idx[oword] for oword in owords]))
 
         print("")
         pickle.dump(data, open(os.path.join(self.args.datadir, 'train.dat'), 'wb'))

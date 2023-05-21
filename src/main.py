@@ -18,15 +18,15 @@ if __name__ == '__main__':
     args = parse_args()
 
 
-    if args.print_tofile == 'True':
-        # Open files for stdout and stderr redirection
-        stdout_file = open(os.path.join(args.ckpt_path, 'stdout.log'), 'w')
-        stderr_file = open(os.path.join(args.ckpt_path, 'stderr.log'), 'w')
-        # Redirect stdout and stderr to the files
-        sys.stdout = stdout_file
-        sys.stderr = stderr_file
+    # if args.print_tofile == 'True':
+    #     # Open files for stdout and stderr redirection
+    #     stdout_file = open(os.path.join(args.ckpt_path, 'stdout.log'), 'w')
+    #     stderr_file = open(os.path.join(args.ckpt_path, 'stderr.log'), 'w')
+    #     # Redirect stdout and stderr to the files
+    #     sys.stdout = stdout_file
+    #     sys.stderr = stderr_file
 
-    save_args_to_file(args, os.path.join(args.ckpt_path, 'args.json'))
+    # save_args_to_file(args, os.path.join(args.ckpt_path, 'args.json'))
 
     # print args
     print(args)
@@ -39,46 +39,46 @@ if __name__ == '__main__':
         pre.convert()
         print('preprocessing finished')
 
-    # load the training data
-    print('loading the data...')
-    idx2word = pickle.load(open(os.path.join(args.datadir, 'preprocessed', 'idx2word.dat'), 'rb'))
-    word_count = pickle.load(open(os.path.join(args.datadir, 'preprocessed', 'word_count.dat'), 'rb'))
+    # # load the training data
+    # print('loading the data...')
+    # idx2word = pickle.load(open(os.path.join(args.datadir, 'preprocessed', 'idx2word.dat'), 'rb'))
+    # word_count = pickle.load(open(os.path.join(args.datadir, 'preprocessed', 'word_count.dat'), 'rb'))
 
 
-    ############################## 3. build the model ################################
-    wf = np.array([word_count[word] for word in idx2word])
-    wf = wf / wf.sum()
-    ws = 1 - np.sqrt(args.ss_t / wf)
-    ws = np.clip(ws, 0, 1)
-    vocab_size = len(idx2word)
-    weights = wf
+    # ############################## 3. build the model ################################
+    # wf = np.array([word_count[word] for word in idx2word])
+    # wf = wf / wf.sum()
+    # ws = 1 - np.sqrt(args.ss_t / wf)
+    # ws = np.clip(ws, 0, 1)
+    # vocab_size = len(idx2word)
+    # weights = wf
 
-    modelpath = os.path.join(args.ckpt_path, '{}.pt'.format(args.name))
-    sgns = SGNS(args)
-    sgns = torch.nn.DataParallel(sgns, device_ids=range(torch.cuda.device_count()))
-    if args.cuda == 'True':
-        sgns.cuda()
-    optim = Adam(sgns.parameters())
+    # modelpath = os.path.join(args.ckpt_path, '{}.pt'.format(args.name))
+    # sgns = SGNS(args)
+    # sgns = torch.nn.DataParallel(sgns, device_ids=range(torch.cuda.device_count()))
+    # if args.cuda == 'True':
+    #     sgns.cuda()
+    # optim = Adam(sgns.parameters())
 
 
-    ############################## 4. train the model ################################
-    for epoch in range(1, args.epoch + 1):
-        dataset = PermutedSubsampledCorpus(os.path.join(args.datadir, 'train.dat'))
-        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
-        total_batches = int(np.ceil(len(dataset) / args.batch_size))
-        pbar = tqdm(dataloader)
-        pbar.set_description("[Epoch {}]".format(epoch))
-        for iword, owords in pbar:
-            loss = sgns(iword, owords)
-            optim.zero_grad()
-            loss.backward()
-            optim.step()
-            pbar.set_postfix(loss=loss.item())
+    # ############################## 4. train the model ################################
+    # for epoch in range(1, args.epoch + 1):
+    #     dataset = PermutedSubsampledCorpus(os.path.join(args.datadir, 'train.dat'))
+    #     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+    #     total_batches = int(np.ceil(len(dataset) / args.batch_size))
+    #     pbar = tqdm(dataloader)
+    #     pbar.set_description("[Epoch {}]".format(epoch))
+    #     for iword, owords in pbar:
+    #         loss = sgns(iword, owords)
+    #         optim.zero_grad()
+    #         loss.backward()
+    #         optim.step()
+    #         pbar.set_postfix(loss=loss.item())
 
-    idx2vec = sgns.get_embeddings('in')
-    pickle.dump(idx2vec, open(os.path.join(args.datadir, 'idx2vec.dat'), 'wb'))
-    torch.save(sgns.state_dict(), os.path.join(args.ckpt_path, '{}.pt'.format(args.name)))
-    torch.save(optim.state_dict(), os.path.join(args.ckpt_path, '{}.optim.pt'.format(args.name)))
+    # idx2vec = sgns.get_embeddings('in')
+    # pickle.dump(idx2vec, open(os.path.join(args.datadir, 'idx2vec.dat'), 'wb'))
+    # torch.save(sgns.state_dict(), os.path.join(args.ckpt_path, '{}.pt'.format(args.name)))
+    # torch.save(optim.state_dict(), os.path.join(args.ckpt_path, '{}.optim.pt'.format(args.name)))
 
     
     
