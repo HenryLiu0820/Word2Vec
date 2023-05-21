@@ -82,7 +82,7 @@ class preprocess:
                     data.append((self.word2idx[iword], [self.word2idx[oword] for oword in owords]))
 
         print("")
-        pickle.dump(data, open(os.path.join(self.args.datadir, 'train.npy'), 'wb'))
+        pickle.dump(data, open(os.path.join(self.args.datadir, 'train.dat'), 'wb'))
         print("convert done")
         
         

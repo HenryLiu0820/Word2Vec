@@ -4,10 +4,11 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Word2Vec')
 
     # basic arguments
+    parser.add_argument('--name', type=str, default='word2vec', help='name of the experiment')
     parser.add_argument('--load', type=str, default='False', help='if load training data from local file')
     parser.add_argument('--print_tofile', type=str, default='True', help='if print log content to file')
-    parser.add_argument('--ckpt_path', type=str, default='/Users/henryliu/Desktop/Henry/学习/untitled folder/大三/大三下/自然语言处理/labs/lab2/src/checkpoints', help='directory to store and load the checkpoints')
-    parser.add_argument('--datadir', type=str, default='/Users/henryliu/Desktop/Henry/学习/untitled folder/大三/大三下/自然语言处理/labs/lab2/data', help='directory to training/testing data')
+    parser.add_argument('--ckpt_path', type=str, default='./data', help='directory to store and load the checkpoints')
+    parser.add_argument('--datadir', type=str, default='./data', help='directory to training/testing data')
 
     # preprocessing related
     parser.add_argument('--window_size', type=int, default=8, help='window size for skipgram')
