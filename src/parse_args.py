@@ -22,8 +22,7 @@ def parse_args():
     parser.add_argument('--epoch', type=int, default=100, help="number of epochs")
     parser.add_argument('--batch_size', type=int, default=4096, help="mini-batch size")
     parser.add_argument('--ss_t', type=float, default=1e-5, help="subsample threshold")
-    parser.add_argument('--weights', action='store_true', help="use weights for negative sampling")
-    parser.add_argument('--cuda', action='store_true', help="use CUDA")
+    parser.add_argument('--cuda', type=str, default='False', help="use CUDA")
 
 
     args = parser.parse_args()
