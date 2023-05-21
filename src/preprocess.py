@@ -43,7 +43,7 @@ class preprocess:
                 for word in sent:
                     self.word_count[word] = self.word_count.get(word, 0) + 1
         print("")
-        self.idx2word = [self.args.unk] + sorted(self.word_count.items(), reverse=True)[: self.args.max_vocab - 1]
+        self.idx2word = sorted(self.word_count, key=self.word_count.get, reverse=True)[: self.args.max_vocab - 1]
         self.word2idx = {self.idx2word[idx]: idx for idx, _ in enumerate(self.idx2word)}
         self.corpus = set([word for word in self.word2idx])
 

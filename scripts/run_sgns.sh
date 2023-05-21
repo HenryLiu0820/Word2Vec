@@ -12,7 +12,7 @@ hostname
 date
 echo starting job...
 source ~/.bashrc
-conda activate ww_prune
+conda activate lzhenv
 export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=1
 
@@ -22,12 +22,12 @@ cd ${root}
 name=sgns
 load=False
 print_tofile=True
-ckpt_path=/scratch/zhliu/checkpoint/${name}
+ckpt_path=/scratch/zhliu/checkpoints/${name}
 datadir=${root}/data
 window_size=2
 unk='<UNK>'
 max_vocab=100000
-filename=wordsim353_agreed.txt
+filename=text8.txt
 e_dim=300
 n_negs=20
 epoch=100
@@ -38,7 +38,9 @@ cuda=True
 mkdir -p ${ckpt_path}
 
 cd src
-CUDA_VISIBLE_DEVICES=0,1  python main.py \
+pwd
+CUDA_VISIBLE_DEVICES=6,7  python main.py \
+    --name ${name} \
     --load ${load} \
     --print_tofile ${print_tofile} \
     --ckpt_path ${ckpt_path} \

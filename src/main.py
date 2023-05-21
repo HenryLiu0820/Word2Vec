@@ -2,7 +2,6 @@ from preprocess import *
 from utils import *
 from parse_args import *
 from models import *
-import argparse
 import os
 import sys
 import numpy as np
@@ -54,18 +53,19 @@ if __name__ == '__main__':
     vocab_size = len(idx2word)
     weights = wf
 
-    model = Word2Vec(vocab_size=vocab_size, embedding_size=args.e_dim)
     modelpath = os.path.join(args.ckpt_path, '{}.pt'.format(args.name))
-    sgns = SGNS(embedding=model, vocab_size=vocab_size, n_negs=args.n_negs, weights=weights)
+    sgns = SGNS(args)
     sgns = torch.nn.DataParallel(sgns, device_ids=range(torch.cuda.device_count()))
+    if args.cuda == 'True':
+        sgns.cuda()
     optim = Adam(sgns.parameters())
 
 
     ############################## 4. train the model ################################
     for epoch in range(1, args.epoch + 1):
-        dataset = PermutedSubsampledCorpus(os.path.join(args.data_dir, 'train.dat'))
-        dataloader = DataLoader(dataset, batch_size=args.mb, shuffle=True)
-        total_batches = int(np.ceil(len(dataset) / args.mb))
+        dataset = PermutedSubsampledCorpus(os.path.join(args.datadir, 'train.dat'))
+        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+        total_batches = int(np.ceil(len(dataset) / args.batch_size))
         pbar = tqdm(dataloader)
         pbar.set_description("[Epoch {}]".format(epoch))
         for iword, owords in pbar:
@@ -75,7 +75,7 @@ if __name__ == '__main__':
             optim.step()
             pbar.set_postfix(loss=loss.item())
 
-    idx2vec = model.ivectors.weight.data.cpu().numpy()
+    idx2vec = sgns.get_embeddings('in')
     pickle.dump(idx2vec, open(os.path.join(args.datadir, 'idx2vec.dat'), 'wb'))
     torch.save(sgns.state_dict(), os.path.join(args.ckpt_path, '{}.pt'.format(args.name)))
     torch.save(optim.state_dict(), os.path.join(args.ckpt_path, '{}.optim.pt'.format(args.name)))
