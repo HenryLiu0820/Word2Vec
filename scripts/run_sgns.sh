@@ -22,7 +22,6 @@ cd ${root}
 name=sgns
 load=True
 print_tofile=True
-ckpt_path=/scratch/zhliu/checkpoints/${name}
 datadir=${root}/data
 window_size=2
 unk='<UNK>'
@@ -30,12 +29,15 @@ max_vocab=100000
 filename=text8.txt
 e_dim=300
 n_negs=5
-epoch=100
-batch_size=4096
+epoch=10
+batch_size=1024
 ss_t=1e-5
 cuda=True
-lr=0.1
+lr=0.001
+betas=(0.9 0.999)
+eps=1e-8
 weight_decay=1e-4
+ckpt_path=/scratch/zhliu/checkpoints/${name}/epoch_${epoch}/batch_size_${batch_size}/lr_${lr}/weight_decay_${weight_decay}
 
 mkdir -p ${ckpt_path}
 
@@ -58,4 +60,6 @@ CUDA_VISIBLE_DEVICES=6,7  python train.py \
     --ss_t ${ss_t} \
     --cuda ${cuda} \
     --lr ${lr} \
+    --betas ${betas[@]} \
+    --eps ${eps} \
     --weight_decay ${weight_decay} \

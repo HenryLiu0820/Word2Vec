@@ -18,6 +18,10 @@ if __name__ == '__main__':
     print('parsing arguments...')
     args = parse_args()
 
+    # create the checkpoint directory if it does not exist
+    if not os.path.exists(args.ckpt_path):
+        os.makedirs(args.ckpt_path)
+
 
     if args.print_tofile == 'True':
         # Open files for stdout and stderr redirection
@@ -59,7 +63,7 @@ if __name__ == '__main__':
     # sgns = torch.nn.DataParallel(sgns, device_ids=range(torch.cuda.device_count()))
     if args.cuda == 'True':
         sgns.cuda()
-    optim = Adam(sgns.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optim = Adam(sgns.parameters(), lr=args.lr, betas=args.betas, eps=args.eps, weight_decay=args.weight_decay)
 
     training_stats = {
         'epoch': [],
@@ -68,6 +72,8 @@ if __name__ == '__main__':
         'loss_n': []
     }
 
+    # flush the output
+    sys.stdout.flush()
 
     ############################## 4. train the model ################################
     for epoch in range(1, args.epoch + 1):
@@ -81,9 +87,14 @@ if __name__ == '__main__':
         print('Starting epoch: {}'.format(epoch))
         for _, (iword, owords) in enumerate(dataloader):
             step += 1
-            nwords = FT(owords.size()[0], owords.size()[1] * args.n_negs).uniform_(0, vocab_size - 1).long()
+            nwords = FT(owords.size()[0], args.n_negs).uniform_(0, vocab_size - 1).long()
             iword = LT(iword)
             owords = LT(owords)
+            if epoch == 1 and step <= 1:
+                print('iword: {}, shape: {}'.format(iword, iword.shape))
+                print('owords: {}, shape: {}'.format(owords, owords.shape))
+                print('nwords: {}, shape: {}'.format(nwords, nwords.shape))
+            sys.stdout.flush()
             if args.cuda == 'True':
                 iword = iword.cuda()
                 owords = owords.cuda()
@@ -107,6 +118,9 @@ if __name__ == '__main__':
         training_stats['loss_o'].append(loss_o)
         training_stats['loss_n'].append(loss_n)
 
+        # flush the output
+        sys.stdout.flush()
+
 
     np.save(os.path.join(args.ckpt_path, "training_stats.npy"), training_stats)
 
@@ -114,10 +128,8 @@ if __name__ == '__main__':
     pickle.dump(idx2vec, open(os.path.join(args.datadir, 'idx2vec.dat'), 'wb'))
     torch.save(sgns.state_dict(), os.path.join(args.ckpt_path, '{}.pt'.format(args.name)))
     torch.save(optim.state_dict(), os.path.join(args.ckpt_path, '{}.optim.pt'.format(args.name)))
-
     
-    
-if args.print_tofile == 'True':
-    # Close the files to flush the output
-    stdout_file.close()
-    stderr_file.close()
+    if args.print_tofile == 'True':
+        # Close the files to flush the output
+        stdout_file.close()
+        stderr_file.close()
