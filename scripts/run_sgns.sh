@@ -20,7 +20,7 @@ root=/scratch/zhliu/repos/Word2Vec
 cd ${root}
 
 name=sgns
-load=False
+load=True
 print_tofile=True
 ckpt_path=/scratch/zhliu/checkpoints/${name}
 datadir=${root}/data
@@ -29,17 +29,19 @@ unk='<UNK>'
 max_vocab=100000
 filename=text8.txt
 e_dim=300
-n_negs=20
+n_negs=5
 epoch=100
 batch_size=4096
 ss_t=1e-5
 cuda=True
+lr=0.1
+weight_decay=1e-4
 
 mkdir -p ${ckpt_path}
 
 cd src
 pwd
-CUDA_VISIBLE_DEVICES=6,7  python main.py \
+CUDA_VISIBLE_DEVICES=6,7  python train.py \
     --name ${name} \
     --load ${load} \
     --print_tofile ${print_tofile} \
@@ -55,3 +57,5 @@ CUDA_VISIBLE_DEVICES=6,7  python main.py \
     --batch_size ${batch_size} \
     --ss_t ${ss_t} \
     --cuda ${cuda} \
+    --lr ${lr} \
+    --weight_decay ${weight_decay} \
