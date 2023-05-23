@@ -3,28 +3,44 @@ from torch.utils.data import Dataset, DataLoader
 import pickle
 import random
 import numpy as np
+import torch
+import torch.nn.functional as F
 
 
 def save_args_to_file(args, output_file_path):
     with open(output_file_path, "w") as output_file:
         json.dump(vars(args), output_file, indent=4)
 
+def one_hot(mat, vocab_size):
+    '''
+    convert the last dimension with index to one-hot vector
+    '''
 
-class PermutedSubsampledCorpus(Dataset):
+    return F.one_hot(mat, num_classes=vocab_size)
 
-    def __init__(self, datapath, ws=None):
-        data = pickle.load(open(datapath, 'rb'))
-        if ws is not None:
-            self.data = []
-            for iword, owords in data:
-                if random.random() > ws[iword]:
-                    self.data.append((iword, owords))
-        else:
-            self.data = data
 
-    def __len__(self):
-        return len(self.data)
+def cosine_distance(v1, v2):
+    '''
+    calculate the cosine distance of two word vectors
+    '''
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
 
-    def __getitem__(self, idx):
-        iword, owords = self.data[idx]
-        return iword, np.array(owords)
+
+def distance_matrix(w_idx, mat):
+    '''
+    calculate the distance of a given word to all the words in the word embedding matrix
+    input:
+        w_idx: an index of a word -- scalar
+        mat: a word embedding matrix -- numpy array(word_num, embed_dim)
+
+    output:
+        mat: a distance matrix -- (word_num, 1)
+        top5idx: the indices 5 of the word with the maximum distance to the given word -- numpy array(5)
+    '''
+    w_vec = mat[w_idx]
+    mat = np.dot(mat, w_vec) / (np.linalg.norm(mat, axis=1) * np.linalg.norm(w_vec))
+    max_idx = np.argsort(mat)[-5:]
+
+    return mat, max_idx
+
+

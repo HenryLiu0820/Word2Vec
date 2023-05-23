@@ -3,11 +3,13 @@ Data preprocessing, extract and build corpus from the given training data file
 '''
 
 import os
-import re
-import json
 import pickle
-import argparse
-import codecs
+import torch
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
+import collections
+import numpy as np
+from tqdm import tqdm
 
 
 class preprocess:
@@ -15,59 +17,89 @@ class preprocess:
     def __init__(self, args):
         self.args = args
 
-    def skipgram(self, sentence, i):
-        '''
-        Get the skipgram pairs from the given sentence
-        :param: sentence: list of words, i: index of the cecnter word
-        :return: skipgram list around the center word
-        from the paper by Mikolov et.al: https://arxiv.org/pdf/1301.3781.pdf
-        '''
-        iword = sentence[i]
-        left = sentence[max(i - self.args.window_size, 0): i]
-        right = sentence[i + 1: i + self.args.window_size + 1]
-        return iword, [self.args.unk for _ in range(self.args.window_size - len(left))] + left + right + [self.args.unk for _ in range(self.args.window_size - len(right))]
-    
     def build(self):
-        print('Building corpus...')
+        print('Building vocabulary...')
         self.word_count = {self.args.unk: 1}
         with open(os.path.join(self.args.datadir, self.args.filename), 'r') as file:
-            text = file.read().strip("\n")
+            corpus = file.read().strip("\n")
         file.close()
-        text = text.strip().lower()
-        self.text = text.split(" ")
-        print('Finished extracting words. Total words: {}'.format(len(text)))
-        # word count
-        for word in self.text:
-            self.word_count[word] = self.word_count.get(word, 0) + 1
+        corpus = corpus.strip().lower()
+        corpus = corpus.split(" ")
+        print('Finished extracting words. Total words: {}'.format(len(corpus)))
+
+        # build the corpus
+        counter = collections.Counter(corpus)
+        # get only the most common max_vocab words (rest are treated as unknown), sorted by frequency
+        most_freq = counter.most_common(self.args.max_vocab)
+        vocabulary = [word for word, _ in most_freq]
+        words_freq = [freq for word, freq in most_freq]
         
-        print("")
-        self.freq_dict = sorted(list(self.word_count.items()), key=lambda x: x[1], reverse=True)
-        self.idx2word = [self.args.unk] + [word for word, _ in self.freq_dict]
-        self.word2idx = {self.idx2word[idx]: idx for idx, _ in enumerate(self.idx2word)}
-        self.corpus = set([word for word in self.word2idx])
+        vocabulary = vocabulary[: len(vocabulary) - 1]
+        vocabulary.append(self.args.unk)
+        words_freq = words_freq[: len(vocabulary) - 1]
+        words_freq.append(len(corpus) - sum(words_freq))
+
+        word2idx = {word: idx for idx, word in enumerate(vocabulary)}
+        idx2word = {idx: word for idx, word in enumerate(vocabulary)}
+
+        # convert all the words in the text to their corresponding index, 
+        # if not in word2idx, then use the index of unknown token
+        text_idx = [word2idx.get(word, 0) for word in corpus]
+
+        # downsample the frequent words
+        words_freq = np.array(words_freq) / len(corpus)
+        sub_sampled_data = []
+        sub_freq = (np.sqrt(words_freq / 0.001) + 1) * 0.001 / words_freq
+        sub_sampled_data = [word for word in tqdm(text_idx) if np.random.rand() < sub_freq[word]]
+        text_idx = np.array(sub_sampled_data)
+
+        words_freq = words_freq ** (3. / 4)
+        words_freq = words_freq / np.sum(words_freq)
 
         # create new directory in datadir to save the corpus
         save_path = os.path.join(self.args.datadir, 'preprocessed')
         if not os.path.exists(save_path):
             os.makedirs(save_path)
-        pickle.dump(self.word_count, open(os.path.join(save_path, 'word_count.dat'), 'wb'))
-        pickle.dump(self.corpus, open(os.path.join(save_path, 'corpus.dat'), 'wb'))
-        pickle.dump(self.idx2word, open(os.path.join(save_path, 'idx2word.dat'), 'wb'))
-        pickle.dump(self.word2idx, open(os.path.join(save_path, 'word2idx.dat'), 'wb'))
-        print("build done")
+        pickle.dump(word2idx, open(os.path.join(save_path, 'word2idx.dat'), 'wb'))          # find index for the given word
+        pickle.dump(vocabulary, open(os.path.join(save_path, 'vocabulary.dat'), 'wb'))      # find word for given index
+        pickle.dump(text_idx, open(os.path.join(save_path, 'text_idx.dat'), 'wb'))          # find indices for the given corpus
+        pickle.dump(words_freq, open(os.path.join(save_path, 'words_freq.dat'), 'wb'))      # find frequency for the given word
 
-    def convert(self):
-        '''
-        Convert the corpus to the trainable skipgram pairs
-        '''
-        print('Converting corpus to trainable data...')
-        data = []
-        for i in range(len(self.text)):
-            iword, owords = self.skipgram(self.text, i)
-            data.append((self.word2idx[iword], [self.word2idx[oword] for oword in owords]))
+        print('Finished building corpus. Total words in the corpus: {}'.format(len(vocabulary)))
 
-        print("")
-        pickle.dump(data, open(os.path.join(self.args.datadir, 'train.dat'), 'wb'))
-        print("convert done")
+        return word2idx, vocabulary, text_idx, words_freq
+
         
         
+class SGNSDataset(Dataset):
+    def __init__(self, word2idx, text_idx, words_freq, args):
+        super().__init__()
+        self.text_idx = torch.tensor(text_idx, dtype=torch.int32)
+        self.word2idx = word2idx
+        self.length = len(text_idx)
+        self.words_freq = torch.tensor(words_freq, dtype=torch.float32)
+        self.window_size = args.window_size
+        self.n_negs = args.n_negs
+        self.args = args
+
+    def __len__(self):
+        return len(self.text_idx)
+
+    def __getitem__(self, idx):
+        """
+        get the center word, context words and negative samples of a given index
+
+        Get the skipgram pairs from the given sentence
+        from the paper by Mikolov et.al: https://arxiv.org/pdf/1301.3781.pdf
+        """
+        iword = self.text_idx[idx]  # index of the center word
+
+        left = list(range(idx - self.window_size, idx))
+        right = list(range(idx + 1, idx + self.window_size + 1))
+        owords_idx = [i % self.length for i in left + right]
+        # pad the left and right with unknown tokens
+        owords = self.text_idx[owords_idx]
+        
+        # negative sampling
+        nwords = torch.multinomial(self.words_freq, self.n_negs, True)
+        return iword, owords, nwords

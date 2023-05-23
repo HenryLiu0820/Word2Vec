@@ -11,6 +11,7 @@ import torch
 from torch.optim import Adam
 from torch import LongTensor as LT
 from torch import FloatTensor as FT
+from torch.utils.data import DataLoader
 
 if __name__ == '__main__':
 
@@ -41,22 +42,20 @@ if __name__ == '__main__':
         print('preprocessing the data...')
         pre = preprocess(args)
         pre.build()
-        pre.convert()
         print('preprocessing finished')
 
     # load the training data
     print('loading the data...')
-    idx2word = pickle.load(open(os.path.join(args.datadir, 'preprocessed', 'idx2word.dat'), 'rb'))
-    word_count = pickle.load(open(os.path.join(args.datadir, 'preprocessed', 'word_count.dat'), 'rb'))
+    word2idx = pickle.load(open(os.path.join(args.datadir, 'preprocessed', 'word2idx.dat'), 'rb'))
+    vocabulary = pickle.load(open(os.path.join(args.datadir, 'preprocessed', 'vocabulary.dat'), 'rb'))
+    text_idx = pickle.load(open(os.path.join(args.datadir, 'preprocessed', 'text_idx.dat'), 'rb'))
+    words_freq = pickle.load(open(os.path.join(args.datadir, 'preprocessed', 'words_freq.dat'), 'rb'))
+    vocab_size = len(vocabulary)
+    print('loading finished, vocabulary size: {}'.format(vocab_size))
 
 
     ############################## 3. build the model ################################
-    wf = np.array([word_count[word] for word in idx2word])
-    wf = wf / wf.sum()
-    ws = 1 - np.sqrt(args.ss_t / wf)
-    ws = np.clip(ws, 0, 1)
-    vocab_size = len(idx2word)
-    weights = wf
+    
 
     modelpath = os.path.join(args.ckpt_path, '{}.pt'.format(args.name))
     sgns = SGNS(args, vocab_size=vocab_size)
@@ -77,28 +76,24 @@ if __name__ == '__main__':
 
     ############################## 4. train the model ################################
     for epoch in range(1, args.epoch + 1):
-        dataset = PermutedSubsampledCorpus(os.path.join(args.datadir, 'train.dat'))
+        dataset = SGNSDataset(word2idx, text_idx, words_freq, args)
         dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
-        total_batches = int(np.ceil(len(dataset) / args.batch_size))
+        print('dataset size: {}'.format(len(dataset)))
+        print('batch num: {}'.format(len(dataloader)))
         train_loss = 0
         loss_o = 0
         loss_n = 0
         step = 0
         print('Starting epoch: {}'.format(epoch))
-        for _, (iword, owords) in enumerate(dataloader):
+        for _, (iword, owords, nwords) in enumerate(dataloader):
             step += 1
-            nwords = FT(owords.size()[0], args.n_negs).uniform_(0, vocab_size - 1).long()
-            iword = LT(iword)
-            owords = LT(owords)
             if epoch == 1 and step <= 1:
-                print('iword: {}, shape: {}'.format(iword, iword.shape))
-                print('owords: {}, shape: {}'.format(owords, owords.shape))
-                print('nwords: {}, shape: {}'.format(nwords, nwords.shape))
+                print('iword: {}, shape: {}, max: {}'.format(iword, iword.shape, iword.max()))
+                print('owords: {}, shape: {}, max: {}'.format(owords, owords.shape, owords.max()))
+                print('nwords: {}, shape: {}, max: {}'.format(nwords, nwords.shape, nwords.max()))
             sys.stdout.flush()
             if args.cuda == 'True':
-                iword = iword.cuda()
-                owords = owords.cuda()
-                nwords = nwords.cuda()
+                iword, owords, nwords = iword.cuda(), owords.cuda(), nwords.cuda()
             loss, score_o, score_n = sgns(iword, owords, nwords)
             train_loss += loss.item()
             loss_o += score_o.mean().item()

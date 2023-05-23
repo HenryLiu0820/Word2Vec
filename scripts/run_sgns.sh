@@ -20,7 +20,7 @@ root=/scratch/zhliu/repos/Word2Vec
 cd ${root}
 
 name=sgns
-load=True
+load=False
 print_tofile=True
 datadir=${root}/data
 window_size=2
@@ -43,7 +43,7 @@ mkdir -p ${ckpt_path}
 
 cd src
 pwd
-CUDA_VISIBLE_DEVICES=6,7  python train.py \
+CUDA_VISIBLE_DEVICES=7  python train.py \
     --name ${name} \
     --load ${load} \
     --print_tofile ${print_tofile} \

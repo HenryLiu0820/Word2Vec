@@ -8,9 +8,11 @@ from torch import LongTensor as LT
 from torch import FloatTensor as FT
 
 class SGNS(nn.Module):
-    def __init__(self, args, vocab_size, init_scale=0.1):
+    def __init__(self, args, vocab_size):
         super(SGNS, self).__init__()
         self.args = args
+
+        init_scale = 0.5 / args.e_dim
         self.in_embed = nn.Embedding(vocab_size, args.e_dim)
         self.in_embed.weight.data.uniform_(-init_scale, init_scale)
         self.out_embed = nn.Embedding(vocab_size, args.e_dim)
@@ -28,7 +30,7 @@ class SGNS(nn.Module):
         '''
 
         # get center word embedding, its shape should be Tensor(batch_size, e_dim, 1)
-        embed_i = self.in_embed(iword).unsqueeze(2) # added a third dimension
+        embed_i = self.in_embed(iword).unsqueeze(-1) # added a third dimension
 
         # get context words embedding, its shape should be Tensor(batch_size, context_size, e_dim)
         embed_o = self.out_embed(owords)
