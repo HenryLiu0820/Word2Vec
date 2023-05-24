@@ -6,6 +6,7 @@ import torch.nn as nn
 
 from torch import LongTensor as LT
 from torch import FloatTensor as FT
+from torch.nn.functional import logsigmoid
 
 class SGNS(nn.Module):
     def __init__(self, args, vocab_size):
@@ -39,12 +40,13 @@ class SGNS(nn.Module):
         embed_n = self.out_embed(nwords).neg()
 
         # calculate the loss
-        score_o = torch.bmm(embed_o, embed_i).squeeze().sigmoid().log().mean(1)
-        score_n = torch.bmm(embed_n, embed_i).squeeze().sigmoid().log().mean(1)
+        score_o = torch.bmm(embed_o, embed_i)
+        score_n = torch.bmm(embed_n, embed_i)
 
-        loss = -(score_o + score_n).mean()
-        # print('loss: ', loss, loss.requires_grad)
-        return loss, score_o, score_n
+        score_o = -torch.sum(logsigmoid(score_o)) / len(iword)
+        score_n = -torch.sum(logsigmoid(score_n)) / len(iword)
+
+        return score_o, score_n
 
     def get_embeddings(self, embedding_type='in'):
         '''

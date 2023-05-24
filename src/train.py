@@ -6,6 +6,7 @@ import os
 import sys
 import numpy as np
 import pickle
+import random
 from tqdm import tqdm
 import torch
 from torch.optim import Adam
@@ -59,7 +60,7 @@ if __name__ == '__main__':
 
     modelpath = os.path.join(args.ckpt_path, '{}.pt'.format(args.name))
     sgns = SGNS(args, vocab_size=vocab_size)
-    # sgns = torch.nn.DataParallel(sgns, device_ids=range(torch.cuda.device_count()))
+    sgns = torch.nn.DataParallel(sgns, device_ids=range(torch.cuda.device_count()))
     if args.cuda == 'True':
         sgns.cuda()
     optim = Adam(sgns.parameters(), lr=args.lr, betas=args.betas, eps=args.eps, weight_decay=args.weight_decay)
@@ -94,13 +95,26 @@ if __name__ == '__main__':
             sys.stdout.flush()
             if args.cuda == 'True':
                 iword, owords, nwords = iword.cuda(), owords.cuda(), nwords.cuda()
-            loss, score_o, score_n = sgns(iword, owords, nwords)
+            score_o, score_n = sgns(iword, owords, nwords)
+            loss = torch.mean(score_o + score_n)
             train_loss += loss.item()
-            loss_o += score_o.mean().item()
-            loss_n += score_n.mean().item()
+            loss_o += torch.mean(score_o).item()
+            loss_n += torch.mean(score_n).item()
             optim.zero_grad()
             loss.backward()
             optim.step()
+
+            # print the training stats
+            if step % 1000 == 0:
+                print('Epoch: {}, Step: {}, train_loss: {}, score_o: {}, score_n: {}'.format(epoch, step, loss.item(), torch.mean(score_o).item(), torch.mean(score_n).item()))
+                sys.stdout.flush()
+
+                # test the embedding
+                test_list = ['rain', 'wind', 'apple', 'sweet', 'house']
+                for test_w in test_list:
+                    in_embed = sgns.module.get_embeddings('in')
+                    print('Words closest to chosen word: {}'.format(test_w))
+                    most_similar(test_w, in_embed, vocabulary, word2idx)
 
         train_loss /= step
         loss_o /= step

@@ -43,4 +43,21 @@ def distance_matrix(w_idx, mat):
 
     return mat, max_idx
 
-
+def most_similar(word, word_vector, words, num, topn=5):
+    '''
+    Get the most similar words for the given word, using trained embedding
+    Used for testing (during training)
+    '''
+    word = word.lower()
+    if word not in words:
+        print('word %s not in vocabulary' % word)
+        return
+    word_vector = word_vector / np.linalg.norm(word_vector, axis=1, keepdims=True)
+    word_id = num[word]
+    word_vec = word_vector[word_id]
+    word_vec = word_vec / np.linalg.norm(word_vec)
+    sim = np.dot(word_vector, word_vec)
+    sim_idx = np.argsort(-sim)
+    sim_idx = sim_idx[1:topn + 1]
+    for idx in sim_idx:
+        print('word: %s, similarity %f' % (words[idx], sim[idx]))

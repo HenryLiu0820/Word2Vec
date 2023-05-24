@@ -12,16 +12,18 @@ if __name__ == '__main__':
     ############################## 1. get word embeddings ################################
     print('loading the word embeddings...')
     word2idx = pickle.load(open(os.path.join(datadir, 'word2idx.dat'), 'rb'))
-    idx2word = pickle.load(open(os.path.join(datadir, 'idx2word.dat'), 'rb'))
+    vocabulary = pickle.load(open(os.path.join(datadir, 'vocabulary.dat'), 'rb'))
+    text_idx = pickle.load(open(os.path.join(datadir, 'text_idx.dat'), 'rb'))
+    words_freq = pickle.load(open(os.path.join(datadir, 'words_freq.dat'), 'rb'))
+    vocab_size = len(vocabulary)
     embeddings = torch.load(os.path.join(ckptdir, 'sgns.pt'))['in_embed.weight'].cpu().numpy()
     print('embeddings shape: {}'.format(embeddings.shape))
 
     ############################## 2. calculate top-5 closest words of the given word ################################
-    word = 'one'
+    word = 'smart'
     word_idx = word2idx[word]
     dist, max_idx = distance_matrix(word_idx, embeddings)
 
     print('the top-5 closest words to {} are:'.format(word))
-    for i in range(5):
-        print(idx2word[max_idx[i]])
+    most_similar(word, embeddings, vocabulary, word2idx)
 
