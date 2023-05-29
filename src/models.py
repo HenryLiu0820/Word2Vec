@@ -14,9 +14,9 @@ class SGNS(nn.Module):
         self.args = args
 
         init_scale = 0.5 / args.e_dim
-        self.in_embed = nn.Embedding(vocab_size, args.e_dim)
+        self.in_embed = nn.Embedding(vocab_size, args.e_dim, )
         self.in_embed.weight.data.uniform_(-init_scale, init_scale)
-        self.out_embed = nn.Embedding(vocab_size, args.e_dim)
+        self.out_embed = nn.Embedding(vocab_size, args.e_dim, )
         self.out_embed.weight.data.uniform_(-init_scale, init_scale)
 
         self.n_negs = args.n_negs

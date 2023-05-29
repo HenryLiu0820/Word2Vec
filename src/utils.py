@@ -5,6 +5,8 @@ import random
 import numpy as np
 import torch
 import torch.nn.functional as F
+import os
+import math
 
 
 def save_args_to_file(args, output_file_path):
@@ -61,3 +63,29 @@ def most_similar(word, word_vector, words, num, topn=5):
     sim_idx = sim_idx[1:topn + 1]
     for idx in sim_idx:
         print('word: %s, similarity %f' % (words[idx], sim[idx]))
+
+def calc_err(embedding, num, args):
+    data = []
+    X = []
+    lines = []
+    test_dir = os.path.join(args.datadir, 'wordsim353_agreed.txt')
+    with open(test_dir, 'r') as f:
+        for line in f.readlines():
+            lines.append(line.strip())
+            data.append(line.split())
+            X.append((num.get(data[-1][1], -1), num.get(data[-1][2], -1)))
+    X = np.array(X)
+    embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)  # 归一化
+    pos = np.any(X == -1, axis=1)  # 带-1的pair
+    embedding_x = embedding[X[:, 0]]
+    embedding_y = embedding[X[:, 1]]
+
+    score = np.sum(embedding_x * embedding_y, axis=1)
+    score[pos] = 0
+    avg_err = 0
+    score = [0 if math.isnan(x) else x for x in score]
+    for i, sim in enumerate(score):
+        avg_err += abs(float(data[i][-1]) - (sim + 1) * 5)
+    avg_err /= len(score)
+    print("avg test err: %f" % (avg_err))
+    return avg_err

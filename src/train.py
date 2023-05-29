@@ -60,7 +60,8 @@ if __name__ == '__main__':
 
     modelpath = os.path.join(args.ckpt_path, '{}.pt'.format(args.name))
     sgns = SGNS(args, vocab_size=vocab_size)
-    sgns = torch.nn.DataParallel(sgns, device_ids=range(torch.cuda.device_count()))
+    sgns.train()
+    # sgns = torch.nn.DataParallel(sgns, device_ids=range(torch.cuda.device_count()))
     if args.cuda == 'True':
         sgns.cuda()
     optim = Adam(sgns.parameters(), lr=args.lr, betas=args.betas, eps=args.eps, weight_decay=args.weight_decay)
@@ -69,7 +70,8 @@ if __name__ == '__main__':
         'epoch': [],
         'train_loss': [],
         'loss_o': [],
-        'loss_n': []
+        'loss_n': [],
+        'avg_err': []
     }
 
     # flush the output
@@ -85,6 +87,7 @@ if __name__ == '__main__':
         loss_o = 0
         loss_n = 0
         step = 0
+        avg_err = 0
         print('Starting epoch: {}'.format(epoch))
         for _, (iword, owords, nwords) in enumerate(dataloader):
             step += 1
@@ -93,39 +96,42 @@ if __name__ == '__main__':
                 print('owords: {}, shape: {}, max: {}'.format(owords, owords.shape, owords.max()))
                 print('nwords: {}, shape: {}, max: {}'.format(nwords, nwords.shape, nwords.max()))
             sys.stdout.flush()
+            optim.zero_grad()
             if args.cuda == 'True':
                 iword, owords, nwords = iword.cuda(), owords.cuda(), nwords.cuda()
             score_o, score_n = sgns(iword, owords, nwords)
-            loss = torch.mean(score_o + score_n)
+            # loss = torch.mean(score_o + score_n)
+            loss = score_o + score_n
             train_loss += loss.item()
-            loss_o += torch.mean(score_o).item()
-            loss_n += torch.mean(score_n).item()
-            optim.zero_grad()
+            loss_o += score_o.item()
+            loss_n += score_n.item()
             loss.backward()
             optim.step()
 
             # print the training stats
             if step % 1000 == 0:
-                print('Epoch: {}, Step: {}, train_loss: {}, score_o: {}, score_n: {}'.format(epoch, step, loss.item(), torch.mean(score_o).item(), torch.mean(score_n).item()))
+                in_embed = sgns.get_embeddings('in')
+                avg_err = calc_err(in_embed, word2idx, args)
+                print('Epoch: {}, Step: {}, train_loss: {}, score_o: {}, score_n: {}, avg_error: {}'.format(epoch, step, loss.item(), score_o.item(), score_n.item(), avg_err))
                 sys.stdout.flush()
 
                 # test the embedding
-                test_list = ['rain', 'wind', 'apple', 'sweet', 'house']
+                test_list = ['rain', 'utah', 'computer', 'brother', 'house']
                 for test_w in test_list:
-                    in_embed = sgns.module.get_embeddings('in')
                     print('Words closest to chosen word: {}'.format(test_w))
                     most_similar(test_w, in_embed, vocabulary, word2idx)
 
         train_loss /= step
         loss_o /= step
         loss_n /= step
-        print('Finished Epoch: {}, train_loss: {}, loss_o: {}, loss_n: {}'.format(epoch, train_loss, loss_o, loss_n))
+        print('Finished Epoch: {}, train_loss: {}, loss_o: {}, loss_n: {}, avg error: {}'.format(epoch, train_loss, loss_o, loss_n, avg_err))
 
         # update training stats
         training_stats['epoch'].append(epoch)
         training_stats['train_loss'].append(train_loss)
         training_stats['loss_o'].append(loss_o)
         training_stats['loss_n'].append(loss_n)
+        training_stats['avg_err'] = avg_err
 
         # flush the output
         sys.stdout.flush()
