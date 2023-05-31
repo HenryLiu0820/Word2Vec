@@ -21,13 +21,14 @@ K = 5
 row = []
 col = []
 data = []
-for i in range(len(corpus) - K):
+for i in range(len(corpus)):
     center = word2idx[corpus[i]] # center word index
-    context = [word2idx[corpus[j]] for j in range(i + 1, i + K + 1)] # context word index
-    for c in context:
-        row.append(center)
-        col.append(c)
-        data.append(1)
+    for offset in range(-K, K + 1):
+        if offset != 0 and i + offset >= 0 and i + offset < len(corpus):
+            context = word2idx[corpus[i + offset]]
+            row.append(center)
+            col.append(context)
+            data.append(1)
 
 # create a sparse matrix objext
 co_matrix = coo_matrix((data, (row, col)), shape=(len(vocab), len(vocab)))
